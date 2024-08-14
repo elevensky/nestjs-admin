@@ -1,30 +1,65 @@
 version: '3.9'
+
 services:
-  nestapp:
-    container_name: nestapp
-    image: francescoxx/nestapp:1.0.0
-    build: .
+  # docker 容器启动的redis默认是没有redis.conf的配置文件，用docker启动redis之前，需要先去官网下载redis.conf的配置文件
+  redis_db: # 服务名称
+    image: redis:alpine
+    container_name: nest-admin-redis
+    restart: always
+    # 配置redis.conf方式启动
+    # command: redis-server /usr/local/etc/redis/redis.conf --requirepass 123456 --appendonly yes # 设置redis登录密码 123456、--appendonly yes：这个命令是用于开启redis数据持久化
+    # 无需配置文件方式启动
+    command: redis-server --appendonly yes # 开启redis数据持久化
     ports:
-      - '3000:3000'
-    environment:
-      - DB_TYPE=postgres
-      - PG_USER=postgres
-      - PG_PASSWORD=postgres
-      - PG_DB=postgres
-      - PG_PORT=5432
-      - PG_HOST=db
-    depends_on:
-      - db
-  db:
-    container_name: db
-    image: postgres:12
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    ports:
-      - '5432:5432'
+      - 6379:6379 # 本机端口:容器端口
     volumes:
-      - pgdata:/var/lib/postgresql/data
-volumes:
-  pgdata: {}
+      - ./deploy/redis/db:/data # 把持久化数据挂载到宿主机
+      - ./deploy/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf # 把redis的配置文件挂载到宿主机
+      - ./deploy/redis/logs:/logs # 用来存放日志
+    environment:
+      - TZ=Asia/Shanghai # 解决容器 时区的问题
+    networks:
+      - nest_admin_net
+
+  mysql_db:
+    image: mysql:8.0.20
+    container_name: nest-admin-mysql
+    restart: always
+    env_file:
+      - .env
+      - .env.production
+    environment:
+      - MYSQL_HOST=${DB_HOST}
+      - MYSQL_PORT=${DB_PORT}
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_USERNAME=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+    ports:
+      - '${DB_PORT}:3306'
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci # 设置utf8字符集
+    volumes:
+      - ./__data/mysql/:/var/lib/mysql/ # ./__data/mysql/ 路径可以替换成自己的路径
+      - ./deploy/sql/:/docker-entrypoint-initdb.d/ # 初始化的脚本，若 ./__data/mysql/ 文件夹存在数据，则不会执行初始化脚本
+    networks:
+      - nest_admin_net
+
+  nest-admin: # nestjs服务
+    container_name: nest-admin
+    build: # 根据Dockerfile构建镜像
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000 # 本机端口:容器端口
+    restart: on-failure # 设置自动重启，这一步必须设置，主要是存在mysql还没有启动完成就启动了node服务
+    networks:
+      - nest_admin_net
+    depends_on: # node服务依赖于mysql和redis
+      - redis_db
+      - mysql_db
+
+# 重要：将所有服务都挂载在同一网桥即可通过容器名来互相通信了
+# 如nestjs连接mysql和redis，可以通过容器名来互相通信
+networks:
+  nest_admin_net:
+    name: nest_admin_net

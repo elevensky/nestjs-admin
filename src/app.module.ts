@@ -1,24 +1,36 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigService, ConfigModule } from '@nestjs/config';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './modules/user/user.module';
 
+import envConfig from '../config/env';
+
 @Module({
   imports: [
-    ConfigModule.forRoot(),
-    UserModule,
-    TypeOrmModule.forRoot({
-      type: process.env.DB_TYPE as any,
-      host: process.env.PG_HOST,
-      port: parseInt(process.env.PG_PORT),
-      username: process.env.PG_USER,
-      password: process.env.PG_PASSWORD,
-      database: process.env.PG_DB,
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true, // 注意下，作用
+    ConfigModule.forRoot({
+      isGlobal: true, // 设置为全局
+      envFilePath: [envConfig.path],
     }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        type: 'mysql',
+        host: configService.get('DB_HOST', 'localhost'), // 主机，默认为localhost
+        port: configService.get<number>('DB_PORT', 3306), // 端口号
+        username: configService.get('DB_USER', 'root'), // 用户名
+        password: configService.get('DB_PASSWORD', 'root'), // 密码
+        database: configService.get('DB_DATABASE', 'test'), //数据库名
+        entities: ['dist/**/*.entity{.ts,.js}'],
+        timezone: '+08:00', //服务器上配置的时区
+        synchronize: true, //根据实体自动创建数据库表， 生产环境建议关闭
+        autoLoadEntities: true,
+      }),
+    }),
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],
