@@ -13,9 +13,9 @@ services:
     ports:
       - 6379:6379 # 本机端口:容器端口
     volumes:
-      - ./deploy/redis/db:/data # 把持久化数据挂载到宿主机
-      - ./deploy/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf # 把redis的配置文件挂载到宿主机
-      - ./deploy/redis/logs:/logs # 用来存放日志
+      - ./docker-data/redis/db:/data # 把持久化数据挂载到宿主机
+      - ./docker-data/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf # 把redis的配置文件挂载到宿主机
+      - ./docker-data/redis/logs:/logs # 用来存放日志
     environment:
       - TZ=Asia/Shanghai # 解决容器 时区的问题
     networks:
@@ -27,7 +27,7 @@ services:
     restart: always
     env_file:
       - .env
-      - .env.production
+      #- .env.prod
     environment:
       - MYSQL_HOST=${DB_HOST}
       - MYSQL_PORT=${DB_PORT}
@@ -39,7 +39,7 @@ services:
       - '${DB_PORT}:3306'
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci # 设置utf8字符集
     volumes:
-      - ./__data/mysql/:/var/lib/mysql/ # ./__data/mysql/ 路径可以替换成自己的路径
+      - ./docker-data/mysql:/var/lib/mysql/ # ./__data/mysql/ 路径可以替换成自己的路径
       - ./deploy/sql/:/docker-entrypoint-initdb.d/ # 初始化的脚本，若 ./__data/mysql/ 文件夹存在数据，则不会执行初始化脚本
     networks:
       - nest_admin_net
@@ -49,6 +49,11 @@ services:
     build: # 根据Dockerfile构建镜像
       context: .
       dockerfile: Dockerfile
+      target: development
+    volumes:
+      - .:/usr/src/app
+    env_file:
+      - .env
     ports:
       - 3000:3000 # 本机端口:容器端口
     restart: on-failure # 设置自动重启，这一步必须设置，主要是存在mysql还没有启动完成就启动了node服务
@@ -62,4 +67,5 @@ services:
 # 如nestjs连接mysql和redis，可以通过容器名来互相通信
 networks:
   nest_admin_net:
-    name: nest_admin_net
+    # 桥接?
+    driver: bridge
