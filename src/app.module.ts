@@ -22,7 +22,7 @@ import envConfig from '../config/env';
         host: configService.get('DB_HOST', 'localhost'), // 主机，默认为localhost
         port: configService.get<number>('DB_PORT', 3306), // 端口号
         username: configService.get('DB_USER', 'root'), // 用户名
-        password: configService.get('DB_PASSWORD', 'root'), // 密码
+        password: configService.get('DB_PASSWORD', '123456'), // 密码
         database: configService.get('DB_DATABASE', 'test'), //数据库名
         entities: ['dist/**/*.entity{.ts,.js}'],
         timezone: '+08:00', //服务器上配置的时区

@@ -4,6 +4,7 @@
 
 FROM node:18-alpine As development
 
+RUN npm config set registry https://registry.npmmirror.com/
 RUN npm i -g pnpm
 
 # 创建应用目录
@@ -61,4 +62,4 @@ COPY --chown=node:node --from=build /usr/src/app/node_modules ./node_modules
 COPY --chown=node:node --from=build /usr/src/app/dist ./dist
 
 # 启动服务
-CMD [ "node", "dist/main.js" ]
+CMD npm run start:dev
